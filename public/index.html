@@ -14,6 +14,7 @@
       <input id="video-url" type="url" placeholder="https://cfvod.kaltura.com/…/seg-11-v1-a1.ts?…" required autocomplete="off">
       <button id="video-download" class="primary" type="submit">Download video ↓</button>
     </form>
+    <button id="video-cancel" type="button" class="secondary" hidden>Cancel download</button>
     <div id="video-progress-wrap" hidden><progress id="video-progress" max="100" value="0" aria-label="Video download progress"></progress><span id="video-percent">0%</span></div>
     <p id="video-status" class="status" role="status" aria-live="polite">Use a fresh link from the player. Signed links can expire.</p>
     <label for="video-name">Lecture filename</label><input id="video-name" class="filename-input" type="text" value="lecture" placeholder="lecture" maxlength="120"><span class="muted"> .mp4</span>

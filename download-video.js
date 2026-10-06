@@ -26,10 +26,10 @@ export function resourceURL(reference, parent) {
   return url;
 }
 
-export async function savePlaylist(url, directory, fetchAPI = fetch, depth = 0) {
+export async function savePlaylist(url, directory, fetchAPI = fetch, depth = 0, signal) {
   if (depth > 5) throw new Error('Too many nested playlists.');
   let response;
-  try { response = await fetchAPI(url, { signal: AbortSignal.timeout(30000) }); }
+  try { response = await fetchAPI(url, { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(30000)]) : AbortSignal.timeout(30000) }); }
   catch { throw new Error('Could not reach the video server. Check the link and your connection.'); }
   if (!response.ok) throw new Error(`Video server returned HTTP ${response.status}. The signed link may have expired; copy a fresh link from the player.`);
   const text = await response.text();
@@ -46,7 +46,7 @@ export async function savePlaylist(url, directory, fetchAPI = fetch, depth = 0) 
     // available bitrate. Separate audio renditions need the original media URL.
     if (/#EXT-X-MEDIA:.*TYPE=AUDIO.*URI=/.test(text)) throw new Error('This master playlist uses separate audio. Paste a combined audio/video media playlist from the player.');
     variants.sort((a, b) => b.bandwidth - a.bandwidth);
-    return savePlaylist(resourceURL(variants[0].reference, url), directory, fetchAPI, depth + 1);
+    return savePlaylist(resourceURL(variants[0].reference, url), directory, fetchAPI, depth + 1, signal);
   }
   if (!text.includes('#EXT-X-ENDLIST')) throw new Error('This is a live or incomplete playlist. Use a finished recording.');
   const rewritten = lines.map(line => {
@@ -59,7 +59,8 @@ export async function savePlaylist(url, directory, fetchAPI = fetch, depth = 0) 
   return path;
 }
 
-export async function downloadVideo(input, output = 'video.mp4', onProgress = () => {}) {
+export async function downloadVideo(input, output = 'video.mp4', onProgress = () => {}, signal) {
+  signal?.throwIfAborted();
   const url = playlistURL(input);
   const destination = resolve(output);
   if (!destination.toLowerCase().endsWith('.mp4')) throw new Error('Output filename must end in .mp4.');
@@ -72,7 +73,7 @@ export async function downloadVideo(input, output = 'video.mp4', onProgress = ()
   try {
     console.log('Fetching the full recording playlist…');
     onProgress({ percent: 0, stage: 'Fetching playlist' });
-    const playlist = await savePlaylist(url, directory);
+    const playlist = await savePlaylist(url, directory, fetch, 0, signal);
     const playlistText = await (await import('node:fs/promises')).readFile(playlist, 'utf8');
     const duration = [...playlistText.matchAll(/#EXTINF:([\d.]+)/g)].reduce((sum, match) => sum + Number(match[1]), 0);
     onProgress({ percent: 0, stage: 'Downloading video' });
@@ -81,6 +82,10 @@ export async function downloadVideo(input, output = 'video.mp4', onProgress = ()
       const child = spawn(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
         '-protocol_whitelist', 'file,http,https,tcp,tls', '-rw_timeout', '30000000', '-xerror',
         '-progress', 'pipe:1', '-nostats', '-i', playlist, '-map', '0:v:0?', '-map', '0:a:0?', '-c', 'copy', '-movflags', '+faststart', partial], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      const cancel = () => child.kill();
+      signal?.addEventListener('abort', cancel, { once: true });
+      if (signal?.aborted) cancel();
+      child.on('close', () => signal?.removeEventListener('abort', cancel));
       // Do not echo FFmpeg errors: they may contain signed access tokens.
       let progressBuffer = '';
       child.stdout.on('data', data => {
@@ -95,7 +100,7 @@ export async function downloadVideo(input, output = 'video.mp4', onProgress = ()
       let failedSegment = false;
       child.stderr.on('data', data => { if (/Failed to open segment|HTTP error|Error opening/i.test(data.toString())) failedSegment = true; });
       child.on('error', () => reject(new Error('Could not start FFmpeg. Run npm install first.')));
-      child.on('close', code => code === 0 && !failedSegment ? resolveRun() : reject(new Error('Download failed. The link may have expired or a segment could not be retrieved. Copy a fresh link and try again.')));
+      child.on('close', code => signal?.aborted ? reject(new Error('Download cancelled.')) : code === 0 && !failedSegment ? resolveRun() : reject(new Error('Download failed. The link may have expired or a segment could not be retrieved. Copy a fresh link and try again.')));
     });
     await rename(partial, destination);
     onProgress({ percent: 100, stage: 'Sending MP4 to your browser' });

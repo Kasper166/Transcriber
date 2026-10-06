@@ -47,7 +47,13 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
         try {
           const path = join(directory, 'video.mp4');
           if (id) downloadProgress.set(id, { percent: 0, stage: 'Starting download' });
-          await download(url.href, path, progress => { if (id) downloadProgress.set(id, progress); });
+          const controller = new AbortController();
+          const cancel = () => { if (!res.writableFinished) controller.abort(); };
+          res.on('close', cancel);
+          try {
+          await download(url.href, path, progress => { if (id) downloadProgress.set(id, progress); }, controller.signal);
+          } finally { res.removeListener('close', cancel); }
+          if (controller.signal.aborted) return;
           const info = await stat(path);
           res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Disposition': 'attachment; filename="video.mp4"', 'Content-Length': info.size, 'Cache-Control': 'no-store' });
           await pipeline(createReadStream(path), res);

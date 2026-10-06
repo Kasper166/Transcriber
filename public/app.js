@@ -1,7 +1,8 @@
 const $ = id => document.getElementById(id);
 let selected = null, audioURL = null, busy = false, configured = false, transcriptName = 'transcript';
 const supported = /\.(mp3|mp4|mpeg|mpga|m4a|wav|webm|ogg|flac)$/i;
-let videoURL = null;
+let videoURL = null, videoController = null;
+$('video-cancel').onclick = () => videoController?.abort();
 function downloadName(value, fallback, extension) {
   const name = value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\.(mp4|txt)$/i, '').replace(/[. ]+$/, '').slice(0, 120);
   return `${name || fallback}.${extension}`;
@@ -11,6 +12,8 @@ $('video-form').onsubmit = async event => {
   event.preventDefault();
   const button = $('video-download');
   const id = crypto.randomUUID();
+  videoController = new AbortController();
+  $('video-cancel').hidden = false;
   $('video-progress-wrap').hidden = false; $('video-progress').value = 0; $('video-percent').textContent = '0%';
   let polling = false;
   const timer = setInterval(async () => {
@@ -29,7 +32,7 @@ $('video-form').onsubmit = async event => {
   $('video-status').textContent = 'Downloading and combining the recording. Keep this page open; large videos can take several minutes.';
   $('video-save').hidden = true;
   try {
-    const response = await fetch('/api/download-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: $('video-url').value.trim(), id }) });
+    const response = await fetch('/api/download-video', { signal: videoController.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: $('video-url').value.trim(), id }) });
     if (!response.ok) { const result = await response.json(); throw new Error(result.error || 'Download failed. Try a fresh link.'); }
     const blob = await response.blob();
     clearInterval(timer); $('video-progress').value = 100; $('video-percent').textContent = '100%';
@@ -38,10 +41,11 @@ $('video-form').onsubmit = async event => {
     const link = $('video-save'); link.href = videoURL; link.download = downloadName($('video-name').value, 'lecture', 'mp4'); link.hidden = false; link.click();
     $('video-status').textContent = 'Your MP4 is ready. Upload it below if you’d like to transcribe it.';
   } catch (error) {
-    $('video-status').textContent = error.message || 'Could not download the video. Please try again.';
-    $('video-status').classList.add('error');
+    $('video-status').textContent = error.name === 'AbortError' ? 'Download cancelled. You can start a new download.' : error.message || 'Could not download the video. Please try again.';
+    $('video-status').classList.toggle('error', error.name !== 'AbortError');
   } finally {
     clearInterval(timer);
+    videoController = null; $('video-cancel').hidden = true;
     button.disabled = false; $('video-url').disabled = false; button.textContent = 'Download video ↓';
   }
 };
