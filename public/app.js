@@ -2,6 +2,11 @@ const $ = id => document.getElementById(id);
 let selected = null, audioURL = null, busy = false, configured = false, transcriptName = 'transcript';
 const supported = /\.(mp3|mp4|mpeg|mpga|m4a|wav|webm|ogg|flac)$/i;
 let videoURL = null;
+function downloadName(value, fallback, extension) {
+  const name = value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\.(mp4|txt)$/i, '').replace(/[. ]+$/, '').slice(0, 120);
+  return `${name || fallback}.${extension}`;
+}
+$('video-save').onclick = () => { $('video-save').download = downloadName($('video-name').value, 'lecture', 'mp4'); };
 $('video-form').onsubmit = async event => {
   event.preventDefault();
   const button = $('video-download');
@@ -16,7 +21,7 @@ $('video-form').onsubmit = async event => {
     const blob = await response.blob();
     if (videoURL) URL.revokeObjectURL(videoURL);
     videoURL = URL.createObjectURL(blob);
-    const link = $('video-save'); link.href = videoURL; link.download = 'video.mp4'; link.hidden = false; link.click();
+    const link = $('video-save'); link.href = videoURL; link.download = downloadName($('video-name').value, 'lecture', 'mp4'); link.hidden = false; link.click();
     $('video-status').textContent = 'Your MP4 is ready. Upload it below if you’d like to transcribe it.';
   } catch (error) {
     $('video-status').textContent = error.message || 'Could not download the video. Please try again.';
@@ -86,6 +91,6 @@ $('copy').onclick = async () => {
 };
 $('download').onclick = () => {
   const url = URL.createObjectURL(new Blob([$ ('text').value], { type: 'text/plain;charset=utf-8' }));
-  const link = document.createElement('a'); link.href = url; link.download = `${transcriptName}.txt`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const link = document.createElement('a'); link.href = url; link.download = downloadName($('text-name').value, transcriptName, 'txt'); link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 fetch('/api/status').then(response => { if (!response.ok) throw new Error(); return response.json(); }).then(data => { configured = data.configured; $('setup').hidden = configured; controls(); }).catch(() => status('Could not connect to the app server. Refresh to try again.', true));

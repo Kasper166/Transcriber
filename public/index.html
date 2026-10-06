@@ -15,6 +15,7 @@
       <button id="video-download" class="primary" type="submit">Download video ↓</button>
     </form>
     <p id="video-status" class="status" role="status" aria-live="polite">Use a fresh link from the player. Signed links can expire.</p>
+    <label for="video-name">Lecture filename</label><input id="video-name" class="filename-input" type="text" value="lecture" placeholder="lecture" maxlength="120"><span class="muted"> .mp4</span>
     <a id="video-save" class="secondary" hidden>Save MP4 again ↓</a>
   </section>
   <div class="workspace">
@@ -33,6 +34,7 @@
       <div class="card-heading"><h2 id="transcript-title"><span class="step">02</span> Your transcript</h2><span id="wordcount" class="muted">0 words</span></div>
       <div id="empty" class="empty"><div class="paper-icon">≡</div><h3>A home for your words.</h3><p>Your transcript will appear here,<br>ready to edit, copy, or download.</p><span class="empty-line"></span></div>
       <textarea id="text" aria-label="Edit transcript" placeholder="Your transcript" hidden></textarea>
+      <label for="text-name">Transcript filename</label><input id="text-name" class="filename-input" type="text" value="transcript" placeholder="transcript" maxlength="120"><span class="muted"> .txt</span>
       <div class="transcript-footer"><span class="muted" id="editor-note">Make it yours.</span><div><button id="copy" class="secondary" disabled>Copy text</button><button id="download" class="secondary" disabled>Download .txt ↓</button></div></div>
     </section>
   </div>
