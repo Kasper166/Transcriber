@@ -13,11 +13,16 @@ const extensions = new Set(['mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'wav', 'webm', 
 const assets = { '/': ['index.html', 'text/html'], '/style.css': ['style.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'] };
 
 export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fetch, prepare = prepareAudio, download = downloadVideo } = {}) {
+  const downloadProgress = new Map();
   return http.createServer(async (req, res) => {
     const json = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
     // Restrict this local service to requests addressed to localhost.
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host || '')) return json(403, { error: 'Local access only.' });
     try {
+      if (req.method === 'GET' && req.url.startsWith('/api/download-progress/')) {
+        const id = req.url.slice('/api/download-progress/'.length);
+        return json(200, downloadProgress.get(id) || { percent: 0, stage: 'Starting download' });
+      }
       if (req.method === 'GET' && req.url === '/api/status') return json(200, { configured: Boolean(apiKey && apiKey !== 'your-api-key-here') });
       if (req.method === 'GET' && assets[req.url]) {
         const [name, type] = assets[req.url];
@@ -35,19 +40,23 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
           if (size > 16384) return json(413, { error: 'The video link is too long.' });
           body += chunk.toString();
         }
-        let url;
-        try { url = playlistURL(JSON.parse(body).url); }
+        let url, id;
+        try { const data = JSON.parse(body); url = playlistURL(data.url); id = typeof data.id === 'string' && /^[a-zA-Z0-9-]{1,64}$/.test(data.id) ? data.id : null; }
         catch { return json(400, { error: 'Paste a complete Kaltura segment or .m3u8 link.' }); }
         const directory = await mkdtemp(join(tmpdir(), 'speech-web-download-'));
         try {
           const path = join(directory, 'video.mp4');
-          await download(url.href, path);
+          if (id) downloadProgress.set(id, { percent: 0, stage: 'Starting download' });
+          await download(url.href, path, progress => { if (id) downloadProgress.set(id, progress); });
           const info = await stat(path);
           res.writeHead(200, { 'Content-Type': 'video/mp4', 'Content-Disposition': 'attachment; filename="video.mp4"', 'Content-Length': info.size, 'Cache-Control': 'no-store' });
           await pipeline(createReadStream(path), res);
         } catch (error) {
           if (!res.headersSent) json(502, { error: error.message });
-        } finally { await rm(directory, { recursive: true, force: true }); }
+        } finally {
+          await rm(directory, { recursive: true, force: true });
+          if (id) { const timer = setTimeout(() => downloadProgress.delete(id), 60000); timer.unref(); }
+        }
         return;
       }
       if (!apiKey || apiKey === 'your-api-key-here') return json(503, { error: 'Add GROQ_API_KEY to your .env file, then restart the app.' });

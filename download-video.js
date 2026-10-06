@@ -59,7 +59,7 @@ export async function savePlaylist(url, directory, fetchAPI = fetch, depth = 0) 
   return path;
 }
 
-export async function downloadVideo(input, output = 'video.mp4') {
+export async function downloadVideo(input, output = 'video.mp4', onProgress = () => {}) {
   const url = playlistURL(input);
   const destination = resolve(output);
   if (!destination.toLowerCase().endsWith('.mp4')) throw new Error('Output filename must end in .mp4.');
@@ -71,19 +71,34 @@ export async function downloadVideo(input, output = 'video.mp4') {
   await writeFile(partial, '', { flag: 'wx' });
   try {
     console.log('Fetching the full recording playlist…');
+    onProgress({ percent: 0, stage: 'Fetching playlist' });
     const playlist = await savePlaylist(url, directory);
+    const playlistText = await (await import('node:fs/promises')).readFile(playlist, 'utf8');
+    const duration = [...playlistText.matchAll(/#EXTINF:([\d.]+)/g)].reduce((sum, match) => sum + Number(match[1]), 0);
+    onProgress({ percent: 0, stage: 'Downloading video' });
     console.log('Downloading and combining video segments…');
     await new Promise((resolveRun, reject) => {
       const child = spawn(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-nostdin', '-y',
         '-protocol_whitelist', 'file,http,https,tcp,tls', '-rw_timeout', '30000000', '-xerror',
-        '-i', playlist, '-map', '0:v:0?', '-map', '0:a:0?', '-c', 'copy', '-movflags', '+faststart', partial], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
+        '-progress', 'pipe:1', '-nostats', '-i', playlist, '-map', '0:v:0?', '-map', '0:a:0?', '-c', 'copy', '-movflags', '+faststart', partial], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
       // Do not echo FFmpeg errors: they may contain signed access tokens.
+      let progressBuffer = '';
+      child.stdout.on('data', data => {
+        progressBuffer += data.toString();
+        const lines = progressBuffer.split('\n'); progressBuffer = lines.pop();
+        for (const line of lines) if (line.startsWith('out_time_us=')) {
+          const seconds = Number(line.split('=')[1]) / 1000000;
+          const percent = duration ? Math.min(99, Math.max(0, Math.floor(seconds / duration * 100))) : 0;
+          onProgress({ percent, stage: percent >= 99 ? 'Preparing MP4' : 'Downloading video' });
+        }
+      });
       let failedSegment = false;
       child.stderr.on('data', data => { if (/Failed to open segment|HTTP error|Error opening/i.test(data.toString())) failedSegment = true; });
       child.on('error', () => reject(new Error('Could not start FFmpeg. Run npm install first.')));
       child.on('close', code => code === 0 && !failedSegment ? resolveRun() : reject(new Error('Download failed. The link may have expired or a segment could not be retrieved. Copy a fresh link and try again.')));
     });
     await rename(partial, destination);
+    onProgress({ percent: 100, stage: 'Sending MP4 to your browser' });
     console.log(`Saved: ${destination}`);
     return destination;
   } finally {

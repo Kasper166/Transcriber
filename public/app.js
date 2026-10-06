@@ -10,15 +10,29 @@ $('video-save').onclick = () => { $('video-save').download = downloadName($('vid
 $('video-form').onsubmit = async event => {
   event.preventDefault();
   const button = $('video-download');
+  const id = crypto.randomUUID();
+  $('video-progress-wrap').hidden = false; $('video-progress').value = 0; $('video-percent').textContent = '0%';
+  let polling = false;
+  const timer = setInterval(async () => {
+    if (polling) return; polling = true;
+    try {
+      const response = await fetch(`/api/download-progress/${id}`);
+      if (!response.ok) return;
+      const progress = await response.json();
+      $('video-progress').value = progress.percent; $('video-percent').textContent = `${progress.percent}%`;
+      $('video-status').textContent = `${progress.stage}. Keep this page open.`;
+    } catch {} finally { polling = false; }
+  }, 1000);
   button.disabled = true; $('video-url').disabled = true;
   button.textContent = 'Downloading…';
   $('video-status').classList.remove('error');
   $('video-status').textContent = 'Downloading and combining the recording. Keep this page open; large videos can take several minutes.';
   $('video-save').hidden = true;
   try {
-    const response = await fetch('/api/download-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: $('video-url').value.trim() }) });
+    const response = await fetch('/api/download-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: $('video-url').value.trim(), id }) });
     if (!response.ok) { const result = await response.json(); throw new Error(result.error || 'Download failed. Try a fresh link.'); }
     const blob = await response.blob();
+    clearInterval(timer); $('video-progress').value = 100; $('video-percent').textContent = '100%';
     if (videoURL) URL.revokeObjectURL(videoURL);
     videoURL = URL.createObjectURL(blob);
     const link = $('video-save'); link.href = videoURL; link.download = downloadName($('video-name').value, 'lecture', 'mp4'); link.hidden = false; link.click();
@@ -27,6 +41,7 @@ $('video-form').onsubmit = async event => {
     $('video-status').textContent = error.message || 'Could not download the video. Please try again.';
     $('video-status').classList.add('error');
   } finally {
+    clearInterval(timer);
     button.disabled = false; $('video-url').disabled = false; button.textContent = 'Download video ↓';
   }
 };
