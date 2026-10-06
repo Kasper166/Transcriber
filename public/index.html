@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Speech Notes — audio to text</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header><a class="brand" href="/" aria-label="Speech Notes home"><span class="mark">▥</span> speech notes<span class="brand-dot">.</span></a><span class="header-label">A little less typing.</span></header>
+<main>
+  <div class="intro"><span class="eyebrow">FROM SPOKEN TO WRITTEN</span><h1>Your words.<br><span>Ready to read.</span></h1><p>Turn voice memos, interviews, and ideas into text.<br>Drop a recording below. We’ll take it from there.</p></div>
+  <div id="setup" class="notice" hidden>Add <code>GROQ_API_KEY</code> to <code>.env</code> and restart the app to enable transcription. See README.md for setup.</div>
+  <div class="workspace">
+    <section class="card upload-card" aria-labelledby="upload-title">
+      <div class="card-heading"><h2 id="upload-title"><span class="step">01</span> Your recording</h2><span class="muted">Audio → text</span></div>
+      <input id="file" type="file" accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.ogg,.flac" hidden>
+      <button id="drop" class="drop" type="button"><span class="upload-icon">↑</span><strong>Drop your audio here</strong><span>or <u>browse files</u></span><small>MP3, WAV, M4A, MP4 & more · up to 500 MB</small></button>
+      <div id="selection" class="selection" hidden><div class="file-icon">♫</div><div class="file-meta"><strong id="filename"></strong><span id="filesize"></span></div><button id="remove" class="icon-button" aria-label="Remove selected file">×</button></div>
+      <audio id="player" controls hidden></audio>
+      <label for="language">Recording language</label><select id="language"><option value="">Detect automatically</option><option value="en">English</option><option value="nl">Dutch</option><option value="fr">French</option><option value="de">German</option><option value="es">Spanish</option><option value="it">Italian</option><option value="pt">Portuguese</option></select>
+      <button id="transcribe" class="primary" disabled><span id="button-label">Transcribe recording</span><span id="button-arrow">↗</span></button>
+      <p id="status" class="status" role="status" aria-live="polite">Select a recording to get started.</p>
+      <p class="privacy">Your recording is sent to Groq for transcription.<br>Large files are split automatically for transcription.</p>
+    </section>
+    <section class="card transcript-card" aria-labelledby="transcript-title">
+      <div class="card-heading"><h2 id="transcript-title"><span class="step">02</span> Your transcript</h2><span id="wordcount" class="muted">0 words</span></div>
+      <div id="empty" class="empty"><div class="paper-icon">≡</div><h3>A home for your words.</h3><p>Your transcript will appear here,<br>ready to edit, copy, or download.</p><span class="empty-line"></span></div>
+      <textarea id="text" aria-label="Edit transcript" placeholder="Your transcript" hidden></textarea>
+      <div class="transcript-footer"><span class="muted" id="editor-note">Make it yours.</span><div><button id="copy" class="secondary" disabled>Copy text</button><button id="download" class="secondary" disabled>Download .txt ↓</button></div></div>
+    </section>
+  </div>
+  <footer><span>Less time transcribing. More time creating.</span><span>Powered by Groq <span class="green-dot"></span></span></footer>
+</main>
+</body></html>

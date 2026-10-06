@@ -1,0 +1,5 @@
+.env
+node_modules/
+*.log
+*.mp4
+*.partial.mp4
