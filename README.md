@@ -1,5 +1,9 @@
 # Speech Notes
 
+**[Open Speech Notes](http://localhost:3000)**
+
+Click the link above to open the app on your computer. Start it first with `npm start` and keep that terminal running. GitHub stores the source code; this link opens your local app. Access from other devices requires hosting the Node.js server.
+
 ## Download a Kaltura video without an API
 
 In the website, paste your link into **Download a video from a link** and click **Download video**. Keep the page open until the MP4 is ready; the browser then saves it. This works without a Groq key. Temporary server files are removed after the video is sent. You can upload the saved video in the transcription section.
