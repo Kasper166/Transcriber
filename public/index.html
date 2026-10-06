@@ -6,6 +6,17 @@
 <main>
   <div class="intro"><span class="eyebrow">FROM SPOKEN TO WRITTEN</span><h1>Your words.<br><span>Ready to read.</span></h1><p>Turn voice memos, interviews, and ideas into text.<br>Drop a recording below. We’ll take it from there.</p></div>
   <div id="setup" class="notice" hidden>Add <code>GROQ_API_KEY</code> to <code>.env</code> and restart the app to enable transcription. See README.md for setup.</div>
+  <section class="card video-card" aria-labelledby="video-title">
+    <div class="card-heading"><h2 id="video-title">Download a video from a link</h2><span class="muted">No API key needed</span></div>
+    <p class="video-help">Paste a Kaltura video segment or playlist link. We’ll download the full recording as an MP4.</p>
+    <form id="video-form" class="video-form">
+      <label class="sr-only" for="video-url">Video link</label>
+      <input id="video-url" type="url" placeholder="https://cfvod.kaltura.com/…/seg-11-v1-a1.ts?…" required autocomplete="off">
+      <button id="video-download" class="primary" type="submit">Download video ↓</button>
+    </form>
+    <p id="video-status" class="status" role="status" aria-live="polite">Use a fresh link from the player. Signed links can expire.</p>
+    <a id="video-save" class="secondary" hidden>Save MP4 again ↓</a>
+  </section>
   <div class="workspace">
     <section class="card upload-card" aria-labelledby="upload-title">
       <div class="card-heading"><h2 id="upload-title"><span class="step">01</span> Your recording</h2><span class="muted">Audio → text</span></div>

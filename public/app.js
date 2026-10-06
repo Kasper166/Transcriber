@@ -1,6 +1,30 @@
 const $ = id => document.getElementById(id);
 let selected = null, audioURL = null, busy = false, configured = false, transcriptName = 'transcript';
 const supported = /\.(mp3|mp4|mpeg|mpga|m4a|wav|webm|ogg|flac)$/i;
+let videoURL = null;
+$('video-form').onsubmit = async event => {
+  event.preventDefault();
+  const button = $('video-download');
+  button.disabled = true; $('video-url').disabled = true;
+  button.textContent = 'Downloading…';
+  $('video-status').classList.remove('error');
+  $('video-status').textContent = 'Downloading and combining the recording. Keep this page open; large videos can take several minutes.';
+  $('video-save').hidden = true;
+  try {
+    const response = await fetch('/api/download-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: $('video-url').value.trim() }) });
+    if (!response.ok) { const result = await response.json(); throw new Error(result.error || 'Download failed. Try a fresh link.'); }
+    const blob = await response.blob();
+    if (videoURL) URL.revokeObjectURL(videoURL);
+    videoURL = URL.createObjectURL(blob);
+    const link = $('video-save'); link.href = videoURL; link.download = 'video.mp4'; link.hidden = false; link.click();
+    $('video-status').textContent = 'Your MP4 is ready. Upload it below if you’d like to transcribe it.';
+  } catch (error) {
+    $('video-status').textContent = error.message || 'Could not download the video. Please try again.';
+    $('video-status').classList.add('error');
+  } finally {
+    button.disabled = false; $('video-url').disabled = false; button.textContent = 'Download video ↓';
+  }
+};
 function status(message, error = false) { $('status').textContent = message; $('status').classList.toggle('error', error); }
 function controls() {
   $('transcribe').disabled = busy || !selected || !configured;

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import http from 'node:http';
+import { writeFile, access } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { createServer } from './server.js';
 
@@ -12,6 +13,22 @@ async function withServer(options, run) {
 function upload(name = 'voice.wav', content = 'audio', language = 'nl') {
   const form = new FormData(); form.set('file', new Blob([content]), name); form.set('language', language); return form;
 }
+test('website downloads MP4 without API key, validates links and removes temporary files', async () => {
+  let downloadedPath;
+  await withServer({ apiKey: '', download: async (url, path) => {
+    assert.match(url, /index.m3u8\?Signature=secret/);
+    downloadedPath = path;
+    await writeFile(path, 'mock-video');
+  } }, async url => {
+    const request = body => fetch(`${url}/api/download-video`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    assert.equal((await request({ url: 'bad' })).status, 400);
+    const response = await request({ url: 'https://cfvod.kaltura.com/name/a.mp4/seg-11-v1-a1.ts?Signature=secret' });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-disposition'), /attachment/);
+    assert.equal(await response.text(), 'mock-video');
+  });
+  await assert.rejects(access(downloadedPath));
+});
 test('serves UI, reports missing key, and prevents secret file access', async () => {
   await withServer({ apiKey: '' }, async url => {
     assert.match(await (await fetch(url)).text(), /Your words/);

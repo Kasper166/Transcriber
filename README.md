@@ -2,6 +2,8 @@
 
 ## Download a Kaltura video without an API
 
+In the website, paste your link into **Download a video from a link** and click **Download video**. Keep the page open until the MP4 is ready; the browser then saves it. This works without a Groq key. Temporary server files are removed after the video is sent. You can upload the saved video in the transcription section.
+
 Run `npm run download`, paste the full signed segment link, and choose an output filename (default: `video.mp4`). You can also run `node download-video.js "URL" "lecture.mp4"`.
 
 The script changes the final `seg-11-v1-a1.ts` (or another segment filename) to `index.m3u8`, preserving the query string. It reads the full playlist, downloads its segments with the same signed access, and combines them into an MP4 using the bundled FFmpeg. No Groq key or other API is used. This downloads the selected video flavor; it cannot recover higher resolution than the supplied flavor offers.
