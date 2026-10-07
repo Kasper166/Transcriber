@@ -5,7 +5,7 @@ let summaryBusy = false;
 let videoURL = null, videoController = null;
 $('video-cancel').onclick = () => videoController?.abort();
 function downloadName(value, fallback, extension) {
-  const name = value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\.(mp4|txt)$/i, '').replace(/[. ]+$/, '').slice(0, 120);
+  const name = value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, '_').replace(/\.(mp4|txt|md|mk)$/i, '').replace(/[. ]+$/, '').slice(0, 120);
   return `${name || fallback}.${extension}`;
 }
 $('video-save').onclick = () => { $('video-save').download = downloadName($('video-name').value, 'lecture', 'mp4'); };
@@ -132,6 +132,6 @@ $('summarize').onclick = async () => {
 };
 $('summary-text').oninput = () => $('summary-download').disabled = !$('summary-text').value.trim();
 $('summary-download').onclick = () => {
-  const url = URL.createObjectURL(new Blob([$ ('summary-text').value], { type: 'text/plain;charset=utf-8' }));
-  const link = document.createElement('a'); link.href = url; link.download = downloadName($('summary-name').value, 'summary', 'txt'); link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const url = URL.createObjectURL(new Blob([$ ('summary-text').value], { type: 'text/markdown;charset=utf-8' }));
+  const link = document.createElement('a'); link.href = url; link.download = downloadName($('summary-name').value, 'summary', 'md'); link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
