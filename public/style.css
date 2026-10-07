@@ -7,3 +7,5 @@
 #video-progress-wrap{display:flex;align-items:center;gap:12px;margin-top:18px}#video-progress{width:100%;height:12px;accent-color:#254e3b}#video-percent{font-size:12px;color:#54705e;min-width:36px}
 
 .summary-card{margin-top:24px}.summary-card textarea{min-height:300px;border:1px solid #e3e7df;border-radius:10px;padding:16px}
+
+.api-progress{display:flex;align-items:center;gap:12px;margin-top:18px}.api-progress progress{width:100%;height:12px;accent-color:#254e3b}.api-progress span{font-size:12px;min-width:36px;color:#54705e}

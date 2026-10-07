@@ -50,6 +50,22 @@ $('video-form').onsubmit = async event => {
     button.disabled = false; $('video-url').disabled = false; button.textContent = 'Download video ↓';
   }
 };
+
+function trackAPI(prefix, statusId) {
+  const id = crypto.randomUUID(); let stopped = false, polling = false;
+  $(prefix + '-progress-wrap').hidden = false; $(prefix + '-progress').value = 0; $(prefix + '-percent').textContent = '0%';
+  const timer = setInterval(async () => {
+    if (polling || stopped) return; polling = true;
+    try {
+      const response = await fetch(`/api/progress/${id}`);
+      if (!response.ok) return;
+      const data = await response.json();
+      if (!stopped) { $(prefix + '-progress').value = data.percent; $(prefix + '-percent').textContent = `${data.percent}%`; $(statusId).textContent = data.stage; }
+    } catch {} finally { polling = false; }
+  }, 1000);
+  return { id, stop(success = false) { stopped = true; clearInterval(timer); if (success) { $(prefix + '-progress').value = 100; $(prefix + '-percent').textContent = '100%'; } } };
+}
+
 function status(message, error = false) { $('status').textContent = message; $('status').classList.toggle('error', error); }
 function controls() {
   updateText();
@@ -93,7 +109,8 @@ $('transcribe').onclick = async () => {
   if (!selected || busy) return;
   busy = true; controls(); status(selected.size > 25 * 1024 * 1024 ? 'Preparing and transcribing your recording in smaller parts. This may take several minutes.' : 'Turning your speech into text. This may take a moment.');
   $('player').pause();
-  const form = new FormData(); form.append('file', selected); form.append('language', $('language').value);
+  const tracker = trackAPI('transcribe', 'status');
+  const form = new FormData(); form.append('id', tracker.id); form.append('file', selected); form.append('language', $('language').value);
   try {
     const response = await fetch('/api/transcribe', { method: 'POST', body: form });
     const result = await response.json();
@@ -104,9 +121,10 @@ $('transcribe').onclick = async () => {
     $('text').value = result.text; $('text').hidden = false; $('empty').hidden = true;
     transcriptName = selected.name.replace(/\.[^.]+$/, '');
     $('editor-note').textContent = 'Edit directly above.';
+    tracker.stop(true);
     updateText(); status(result.text.trim() ? 'Done. Your words are ready.' : 'No speech detected. Try a different recording.');
   } catch (error) { status(error.message || 'Could not reach the server. Please try again.', true); }
-  finally { busy = false; controls(); }
+  finally { tracker.stop(); busy = false; controls(); }
 };
 $('copy').onclick = async () => {
   try { await navigator.clipboard.writeText($('text').value); $('copy').textContent = 'Copied ✓'; setTimeout(() => $('copy').textContent = 'Copy text', 1800); }
@@ -119,17 +137,19 @@ $('download').onclick = () => {
 fetch('/api/status').then(response => { if (!response.ok) throw new Error(); return response.json(); }).then(data => { configured = data.configured; $('setup').hidden = configured; controls(); }).catch(() => status('Could not connect to the app server. Refresh to try again.', true));
 
 async function runSummary(sourceText) {
+  const tracker = trackAPI('summary', 'summary-status');
   summaryBusy = true; updateText(); $('summarize').textContent = 'Summarizing…'; $('summarize-pasted').textContent = 'Summarizing…';
   $('summary-status').textContent = 'Creating detailed notes from every section. Free-tier pacing waits 61 seconds between sections; long transcripts can take several minutes.';
   $('summary-status').classList.remove('error');
   try {
-    const response = await fetch('/api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: sourceText }) });
+    const response = await fetch('/api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: sourceText, id: tracker.id }) });
     const result = await response.json();
     if (result.summary) { $('summary-text').value = result.summary; $('summary-text').hidden = false; $('summary-download').disabled = false; }
     if (!response.ok) throw new Error((result.error || 'Summary failed.') + (result.summary ? ' Completed sections are shown below.' : ''));
+    tracker.stop(true);
     $('summary-status').textContent = 'Your detailed summary is ready to edit and download.';
   } catch (error) { $('summary-status').textContent = error.message; $('summary-status').classList.add('error'); }
-  finally { summaryBusy = false; updateText(); $('summarize').textContent = 'Summarize transcript ↗'; $('summarize-pasted').textContent = 'Summarize pasted text ↗'; }
+  finally { tracker.stop(); summaryBusy = false; updateText(); $('summarize').textContent = 'Summarize transcript ↗'; $('summarize-pasted').textContent = 'Summarize pasted text ↗'; }
 }
 $('summarize').onclick = () => runSummary($('text').value);
 $('summarize-pasted').onclick = () => runSummary($('summary-source').value);

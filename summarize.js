@@ -1,4 +1,4 @@
-export async function summarizeTranscript(text, apiKey, fetchAPI = fetch, reserve = async () => {}) {
+export async function summarizeTranscript(text, apiKey, fetchAPI = fetch, reserve = async () => {}, onProgress = () => {}) {
   // Small sections keep requests manageable on Groq's free tier. Preserve each
   // section's notes instead of compressing them again into a shorter overview.
   const chunks = [];
@@ -16,8 +16,10 @@ export async function summarizeTranscript(text, apiKey, fetchAPI = fetch, reserv
   }
   const notes = [];
   for (let i = 0; i < chunks.length; i++) {
+    onProgress({ percent: Math.floor(i / chunks.length * 100), stage: `Checking free-tier budget / waiting for slot: section ${i + 1} of ${chunks.length}` });
     try { await reserve('text', Buffer.byteLength(chunks[i], 'utf8') + 3600); }
     catch (error) { error.partial = notes.join('\n\n'); throw error; }
+    onProgress({ percent: Math.floor(i / chunks.length * 100), stage: `Summarizing section ${i + 1} of ${chunks.length}` });
     const response = await fetchAPI('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(120000),
@@ -34,6 +36,7 @@ export async function summarizeTranscript(text, apiKey, fetchAPI = fetch, reserv
     if (typeof message !== 'string' || !message.trim()) throw new Error('Groq returned an empty summary. Please try again.');
     if (result.choices[0].finish_reason === 'length') throw new Error('Summary output was cut short. Try summarizing a shorter transcript.');
     notes.push(chunks.length > 1 ? `## Part ${i + 1}\n\n${message}` : message);
+    onProgress({ percent: Math.floor((i + 1) / chunks.length * 100), stage: `Completed ${i + 1} of ${chunks.length} sections` });
   }
   return notes.join('\n\n');
 }

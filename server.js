@@ -20,11 +20,17 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env
   fetchAPI = withGroqFallback(fetchAPI, [apiKey, apiKey2]);
   if (!apiKey || apiKey === 'your-api-key-here') apiKey = apiKey2;
   const downloadProgress = new Map();
+  const apiProgress = new Map();
+  const report = id => progress => { if (/^[a-zA-Z0-9-]{1,64}$/.test(id || '')) apiProgress.set(id, { ...progress, updated: Date.now() }); };
   return http.createServer(async (req, res) => {
     const json = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
     // Restrict this local service to requests addressed to localhost.
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host || '')) return json(403, { error: 'Local access only.' });
     try {
+      if (req.method === 'GET' && req.url.startsWith('/api/progress/')) {
+        for (const [key, value] of apiProgress) if (Date.now() - value.updated > 3600000) apiProgress.delete(key);
+        return json(200, apiProgress.get(req.url.slice('/api/progress/'.length)) || { percent: 0, stage: 'Uploading / preparing request' });
+      }
       if (req.method === 'GET' && req.url.startsWith('/api/download-progress/')) {
         const id = req.url.slice('/api/download-progress/'.length);
         return json(200, downloadProgress.get(id) || { percent: 0, stage: 'Starting download' });
@@ -91,10 +97,10 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env
         if (!req.headers['content-type']?.startsWith('application/json')) return json(400, { error: 'Send a transcript to summarize.' });
         const chunks = []; let size = 0;
         for await (const chunk of req) { size += chunk.length; if (size > 1024 * 1024) return json(413, { error: 'Transcript is too large. Maximum 1 MB.' }); chunks.push(chunk); }
-        let text;
-        try { text = JSON.parse(Buffer.concat(chunks).toString()).text; } catch { return json(400, { error: 'Invalid transcript.' }); }
+        let text, id;
+        try { const data = JSON.parse(Buffer.concat(chunks).toString()); text = data.text; id = data.id; } catch { return json(400, { error: 'Invalid transcript.' }); }
         if (typeof text !== 'string' || !text.trim()) return json(400, { error: 'Add a transcript first.' });
-        try { return json(200, { summary: await summarizeTranscript(text, apiKey, fetchAPI, reserve) }); }
+        try { return json(200, { summary: await summarizeTranscript(text, apiKey, fetchAPI, reserve, report(id)) }); }
         catch (error) { return json(502, { error: error.message, summary: error.partial || '' }); }
       }
       if (!req.headers['content-type']?.startsWith('multipart/form-data;')) return json(400, { error: 'Please upload an audio file.' });
@@ -110,17 +116,20 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env
       try { form = await new Request('http://localhost', { method: 'POST', headers: { 'Content-Type': req.headers['content-type'] }, body: Buffer.concat(chunks) }).formData(); }
       catch { return json(400, { error: 'Could not read the upload. Please select your file again.' }); }
       const file = form.get('file');
+      const progress = report(form.get('id'));
       if (!file || typeof file === 'string' || !file.size) return json(400, { error: 'Choose a non-empty audio file.' });
       if (!extensions.has(file.name.split('.').pop().toLowerCase())) return json(400, { error: 'This file format is not supported.' });
       if (file.size > MAX_FILE) return json(413, { error: 'File must be 500 MB or smaller.' });
       const language = form.get('language');
       if (language && !/^[a-z]{2}$/.test(language)) return json(400, { error: 'Invalid language.' });
+      progress({ percent: 0, stage: 'Preparing audio' });
       let prepared;
       try { prepared = await prepare(file); }
       catch { return json(400, { error: 'Could not read the audio in this recording. Try another file or format.' }); }
       try {
       const texts = [];
       for (const audio of prepared.files) {
+      progress({ percent: Math.floor(texts.length / prepared.files.length * 100), stage: `Transcribing part ${texts.length + 1} of ${prepared.files.length}` });
       if (reserve.enforceAudio) {
         try { await reserve('audio', await audioDuration(audio)); }
         catch (error) { return json(429, { error: error.message, text: texts.join('\n\n') }); }
@@ -140,6 +149,7 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env
       const result = await response.json();
       if (typeof result.text !== 'string') return json(502, { error: 'The API returned an unexpected response.' });
       texts.push(result.text);
+      progress({ percent: Math.floor(texts.length / prepared.files.length * 100), stage: `Completed ${texts.length} of ${prepared.files.length} parts` });
       }
       return json(200, { text: texts.join('\n\n') });
       } finally { await prepared.cleanup(); }
