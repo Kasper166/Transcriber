@@ -5,13 +5,42 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
+import { createWriteStream } from 'node:fs';
+import { Readable, Transform } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+
+export function isDirectVideo(url) {
+  return /\.mp4$/i.test(url.pathname) ||
+    (url.hostname.endsWith('.files.blackboard.com') &&
+      (url.searchParams.get('response-content-type') === 'video/mp4' || /\.mp4/i.test(url.searchParams.get('response-content-disposition') || '')));
+}
+
+export async function downloadDirect(url, output, onProgress, signal, fetchAPI = fetch) {
+  onProgress({ percent: 0, stage: 'Connecting to video server' });
+  const response = await fetchAPI(url, { signal });
+  if (!response.ok) throw new Error(`Video server returned HTTP ${response.status}. Copy a fresh link from Blackboard and try again.`);
+  if (!response.body || !/^(video\/mp4|application\/octet-stream)(;|$)/i.test(response.headers.get('content-type') || '')) {
+    await response.body?.cancel();
+    throw new Error('The link did not return an MP4. Copy a fresh video download link from Blackboard.');
+  }
+  const total = Number(response.headers.get('content-length'));
+  let downloaded = 0;
+  const counter = new Transform({ transform(chunk, encoding, callback) {
+    downloaded += chunk.length;
+    onProgress({ percent: total ? Math.min(99, Math.floor(downloaded / total * 100)) : 0,
+      stage: `Downloading video (${(downloaded / 1048576).toFixed(1)} MB${total ? ` of ${(total / 1048576).toFixed(1)} MB` : ''})` });
+    callback(null, chunk);
+  } });
+  await pipeline(Readable.fromWeb(response.body), counter, createWriteStream(output), { signal });
+  if (!downloaded || (total && downloaded !== total)) throw new Error('The video download was incomplete. Please try again.');
+}
 
 export function playlistURL(input) {
   let url;
-  try { url = new URL(input.trim()); } catch { throw new Error('Paste a complete video segment or .m3u8 URL.'); }
+  try { url = new URL(input.trim().replace(/\\&/g, '&')); } catch { throw new Error('Paste a complete video URL.'); }
   if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) throw new Error('Use an HTTP or HTTPS video URL.');
   if (/\/seg-[^/]+\.ts$/i.test(url.pathname)) url.pathname = url.pathname.replace(/\/seg-[^/]+\.ts$/i, '/index.m3u8');
-  else if (!url.pathname.endsWith('.m3u8')) throw new Error('Use a Kaltura segment link or an HLS .m3u8 playlist link.');
+  else if (!url.pathname.endsWith('.m3u8') && !isDirectVideo(url)) throw new Error('Use a Kaltura segment, .m3u8 playlist, or direct MP4 link.');
   return url;
 }
 
@@ -71,6 +100,9 @@ export async function downloadVideo(input, output = 'video.mp4', onProgress = ()
   // Reserve a unique output so retries never overwrite a previous download.
   await writeFile(partial, '', { flag: 'wx' });
   try {
+    if (isDirectVideo(url)) {
+      await downloadDirect(url, partial, onProgress, signal);
+    } else {
     console.log('Fetching the full recording playlist…');
     onProgress({ percent: 0, stage: 'Fetching playlist' });
     const playlist = await savePlaylist(url, directory, fetch, 0, signal);
@@ -102,6 +134,8 @@ export async function downloadVideo(input, output = 'video.mp4', onProgress = ()
       child.on('error', () => reject(new Error('Could not start FFmpeg. Run npm install first.')));
       child.on('close', code => signal?.aborted ? reject(new Error('Download cancelled.')) : code === 0 && !failedSegment ? resolveRun() : reject(new Error('Download failed. The link may have expired or a segment could not be retrieved. Copy a fresh link and try again.')));
     });
+    }
+    signal?.throwIfAborted();
     await rename(partial, destination);
     onProgress({ percent: 100, stage: 'Sending MP4 to your browser' });
     console.log(`Saved: ${destination}`);

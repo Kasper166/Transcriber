@@ -42,7 +42,7 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
         }
         let url, id;
         try { const data = JSON.parse(body); url = playlistURL(data.url); id = typeof data.id === 'string' && /^[a-zA-Z0-9-]{1,64}$/.test(data.id) ? data.id : null; }
-        catch { return json(400, { error: 'Paste a complete Kaltura segment or .m3u8 link.' }); }
+        catch { return json(400, { error: 'Paste a complete Kaltura segment, .m3u8, or Blackboard MP4 link.' }); }
         const directory = await mkdtemp(join(tmpdir(), 'speech-web-download-'));
         try {
           const path = join(directory, 'video.mp4');
