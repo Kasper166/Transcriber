@@ -48,3 +48,7 @@ The local server reserves usage before API requests and persists it in ignored `
 Keep the Groq account on the Free plan. These safeguards only count this app; usage from other apps, account-specific lower limits, and deleting the usage file can affect the remaining quota. They cannot enforce account billing settings.
 
 You can also paste text into **Text to summarize** in the summary section and click **Summarize pasted text**. This uses the same Groq model and free-tier safeguards as transcript summaries.
+
+## Two Groq API keys
+
+Set `GROQ_API_KEY1` and `GROQ_API_KEY2` in `.env`. The original `GROQ_API_KEY` is still supported. When Groq returns HTTP 429, the app tries the other key once and prefers the working key for later requests. If both keys are limited, it reports the error. Keys in the same organization share Groq limits. Local usage budgets remain shared across keys and are never bypassed by fallback.

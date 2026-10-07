@@ -1,4 +1,5 @@
 import { pdfToMarkdown } from './pdf-markdown.js';
+import { withGroqFallback } from './groq-keys.js';
 import { summarizeTranscript } from './summarize.js';
 import http from 'node:http';
 import { readFile, mkdtemp, rm, stat } from 'node:fs/promises';
@@ -15,7 +16,9 @@ const MAX_FILE = 500 * 1024 * 1024;
 const extensions = new Set(['mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'wav', 'webm', 'ogg', 'flac']);
 const assets = { '/': ['index.html', 'text/html'], '/style.css': ['style.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'] };
 
-export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fetch, prepare = prepareAudio, download = downloadVideo, reserve = async () => {} } = {}) {
+export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env.GROQ_API_KEY, apiKey2 = process.env.GROQ_API_KEY2, fetchAPI = fetch, prepare = prepareAudio, download = downloadVideo, reserve = async () => {} } = {}) {
+  fetchAPI = withGroqFallback(fetchAPI, [apiKey, apiKey2]);
+  if (!apiKey || apiKey === 'your-api-key-here') apiKey = apiKey2;
   const downloadProgress = new Map();
   return http.createServer(async (req, res) => {
     const json = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
@@ -83,7 +86,7 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
           return json(400, { error: /No selectable text|Choose a valid PDF/.test(error.message) ? error.message : 'Could not read this PDF. It may be damaged or password protected.' });
         }
       }
-      if (!apiKey || apiKey === 'your-api-key-here') return json(503, { error: 'Add GROQ_API_KEY to your .env file, then restart the app.' });
+      if (!apiKey || apiKey === 'your-api-key-here') return json(503, { error: 'Add GROQ_API_KEY1 to your .env file, then restart the app.' });
       if (req.url === '/api/summarize') {
         if (!req.headers['content-type']?.startsWith('application/json')) return json(400, { error: 'Send a transcript to summarize.' });
         const chunks = []; let size = 0;
