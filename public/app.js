@@ -86,6 +86,7 @@ function updateText() {
   $('wordcount').textContent = `${words} ${words === 1 ? 'word' : 'words'}`;
   $('copy').disabled = $('download').disabled = !value;
   $('summarize').disabled = summaryBusy || busy || !configured || !value;
+  $('summarize-pasted').disabled = summaryBusy || !configured || !$('summary-source').value.trim();
 }
 $('text').oninput = updateText;
 $('transcribe').onclick = async () => {
@@ -117,19 +118,22 @@ $('download').onclick = () => {
 };
 fetch('/api/status').then(response => { if (!response.ok) throw new Error(); return response.json(); }).then(data => { configured = data.configured; $('setup').hidden = configured; controls(); }).catch(() => status('Could not connect to the app server. Refresh to try again.', true));
 
-$('summarize').onclick = async () => {
-  summaryBusy = true; updateText(); $('summarize').textContent = 'Summarizing…';
+async function runSummary(sourceText) {
+  summaryBusy = true; updateText(); $('summarize').textContent = 'Summarizing…'; $('summarize-pasted').textContent = 'Summarizing…';
   $('summary-status').textContent = 'Creating detailed notes from every section. Free-tier pacing waits 61 seconds between sections; long transcripts can take several minutes.';
   $('summary-status').classList.remove('error');
   try {
-    const response = await fetch('/api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: $('text').value }) });
+    const response = await fetch('/api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: sourceText }) });
     const result = await response.json();
     if (result.summary) { $('summary-text').value = result.summary; $('summary-text').hidden = false; $('summary-download').disabled = false; }
     if (!response.ok) throw new Error((result.error || 'Summary failed.') + (result.summary ? ' Completed sections are shown below.' : ''));
     $('summary-status').textContent = 'Your detailed summary is ready to edit and download.';
   } catch (error) { $('summary-status').textContent = error.message; $('summary-status').classList.add('error'); }
-  finally { summaryBusy = false; updateText(); $('summarize').textContent = 'Summarize transcript ↗'; }
-};
+  finally { summaryBusy = false; updateText(); $('summarize').textContent = 'Summarize transcript ↗'; $('summarize-pasted').textContent = 'Summarize pasted text ↗'; }
+}
+$('summarize').onclick = () => runSummary($('text').value);
+$('summarize-pasted').onclick = () => runSummary($('summary-source').value);
+$('summary-source').oninput = updateText;
 $('summary-text').oninput = () => $('summary-download').disabled = !$('summary-text').value.trim();
 $('summary-download').onclick = () => {
   const url = URL.createObjectURL(new Blob([$ ('summary-text').value], { type: 'text/markdown;charset=utf-8' }));

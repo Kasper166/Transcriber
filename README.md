@@ -46,3 +46,5 @@ Click **Summarize transcript** after transcription, or paste text into the trans
 The local server reserves usage before API requests and persists it in ignored `.groq-usage.json`, so restarting does not reset limits. Summaries use small UTF-8 sections, at most 3,000 output tokens, one request per 61 seconds, and a conservative 100,000-token reservation budget per rolling 24 hours. Audio is limited to 60 minutes per rolling hour and 4 hours per rolling 24 hours. Failed calls also retain their reservations. These caps leave headroom beneath Groq’s published default free quotas. Requests stop on errors instead of retrying automatically. Downloading videos does not use Groq.
 
 Keep the Groq account on the Free plan. These safeguards only count this app; usage from other apps, account-specific lower limits, and deleting the usage file can affect the remaining quota. They cannot enforce account billing settings.
+
+You can also paste text into **Text to summarize** in the summary section and click **Summarize pasted text**. This uses the same Groq model and free-tier safeguards as transcript summaries.

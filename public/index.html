@@ -43,7 +43,10 @@
   </div>
   <section class="card summary-card" aria-labelledby="summary-title">
     <h2 id="summary-title">Detailed study summary</h2>
-    <p id="summary-status" class="status" role="status">Summarize your transcript to extract the important details. You can also paste a transcript into the editor above.</p>
+    <label for="summary-source">Text to summarize</label>
+    <textarea id="summary-source" aria-label="Paste text to summarize" placeholder="Paste your lecture notes, transcript, or other text here…"></textarea>
+    <button id="summarize-pasted" class="primary" disabled>Summarize pasted text ↗</button>
+    <p id="summary-status" class="status" role="status">Summarize your transcript to extract the important details. Paste text above to summarize it directly, or use the transcript button.</p>
     <textarea id="summary-text" aria-label="Edit summary" placeholder="Your summary appears here" hidden></textarea>
     <label for="summary-name">Summary filename</label><input id="summary-name" class="filename-input" value="summary" maxlength="120"><span class="muted"> .md</span>
     <button id="summary-download" class="secondary" disabled>Download Markdown ↓</button>
