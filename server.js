@@ -1,3 +1,4 @@
+import { summarizeTranscript } from './summarize.js';
 import http from 'node:http';
 import { readFile, mkdtemp, rm, stat } from 'node:fs/promises';
 import { createReadStream } from 'node:fs';
@@ -30,7 +31,7 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
         res.writeHead(200, { 'Content-Type': `${type}; charset=utf-8`, 'X-Content-Type-Options': 'nosniff' });
         return res.end(data);
       }
-      if (req.method !== 'POST' || !['/api/transcribe', '/api/download-video'].includes(req.url)) return json(404, { error: 'Not found.' });
+      if (req.method !== 'POST' || !['/api/transcribe', '/api/download-video', '/api/summarize'].includes(req.url)) return json(404, { error: 'Not found.' });
       if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return json(403, { error: 'Invalid request origin.' });
       if (req.url === '/api/download-video') {
         if (!req.headers['content-type']?.startsWith('application/json')) return json(400, { error: 'Send a video link.' });
@@ -66,6 +67,16 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
         return;
       }
       if (!apiKey || apiKey === 'your-api-key-here') return json(503, { error: 'Add GROQ_API_KEY to your .env file, then restart the app.' });
+      if (req.url === '/api/summarize') {
+        if (!req.headers['content-type']?.startsWith('application/json')) return json(400, { error: 'Send a transcript to summarize.' });
+        const chunks = []; let size = 0;
+        for await (const chunk of req) { size += chunk.length; if (size > 1024 * 1024) return json(413, { error: 'Transcript is too large. Maximum 1 MB.' }); chunks.push(chunk); }
+        let text;
+        try { text = JSON.parse(Buffer.concat(chunks).toString()).text; } catch { return json(400, { error: 'Invalid transcript.' }); }
+        if (typeof text !== 'string' || !text.trim()) return json(400, { error: 'Add a transcript first.' });
+        try { return json(200, { summary: await summarizeTranscript(text, apiKey, fetchAPI) }); }
+        catch (error) { return json(502, { error: error.message, summary: error.partial || '' }); }
+      }
       if (!req.headers['content-type']?.startsWith('multipart/form-data;')) return json(400, { error: 'Please upload an audio file.' });
       if (Number(req.headers['content-length']) > MAX_FILE + 65536) return json(413, { error: 'File must be 500 MB or smaller.' });
       let size = 0;

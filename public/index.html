@@ -34,12 +34,21 @@
     </section>
     <section class="card transcript-card" aria-labelledby="transcript-title">
       <div class="card-heading"><h2 id="transcript-title"><span class="step">02</span> Your transcript</h2><span id="wordcount" class="muted">0 words</span></div>
-      <div id="empty" class="empty"><div class="paper-icon">≡</div><h3>A home for your words.</h3><p>Your transcript will appear here,<br>ready to edit, copy, or download.</p><span class="empty-line"></span></div>
-      <textarea id="text" aria-label="Edit transcript" placeholder="Your transcript" hidden></textarea>
+      <div id="empty" class="empty" hidden><div class="paper-icon">≡</div><h3>A home for your words.</h3><p>Your transcript will appear here,<br>ready to edit, copy, or download.</p><span class="empty-line"></span></div>
+      <textarea id="text" aria-label="Edit or paste transcript" placeholder="Paste a transcript here, or upload a recording."></textarea>
+      <button id="summarize" class="primary" disabled>Summarize transcript ↗</button>
       <label for="text-name">Transcript filename</label><input id="text-name" class="filename-input" type="text" value="transcript" placeholder="transcript" maxlength="120"><span class="muted"> .txt</span>
       <div class="transcript-footer"><span class="muted" id="editor-note">Make it yours.</span><div><button id="copy" class="secondary" disabled>Copy text</button><button id="download" class="secondary" disabled>Download .txt ↓</button></div></div>
     </section>
   </div>
+  <section class="card summary-card" aria-labelledby="summary-title">
+    <h2 id="summary-title">Detailed study summary</h2>
+    <p id="summary-status" class="status" role="status">Summarize your transcript to extract the important details. You can also paste a transcript into the editor above.</p>
+    <textarea id="summary-text" aria-label="Edit summary" placeholder="Your summary appears here" hidden></textarea>
+    <label for="summary-name">Summary filename</label><input id="summary-name" class="filename-input" value="summary" maxlength="120"><span class="muted"> .txt</span>
+    <button id="summary-download" class="secondary" disabled>Download summary ↓</button>
+    <p class="privacy">Generated with Groq. Review against your transcript; AI summaries can omit or misinterpret details.</p>
+  </section>
   <footer><span>Less time transcribing. More time creating.</span><span>Powered by Groq <span class="green-dot"></span></span></footer>
 </main>
 </body></html>

@@ -32,3 +32,7 @@ Your key stays on the server. Audio is forwarded to Groq. Files over 25 MB are t
 Run `npm test` for backend validation and mocked API integration checks. Live transcription requires a configured API key and is not exercised by these tests.
 
 Direct Blackboard MP4 links also work in the website and command-line downloader. Their signed query is preserved; progress is measured in downloaded bytes and Cancel stops the transfer. Signed links may expire, so paste a fresh link if the server rejects it.
+
+## Detailed transcript summaries
+
+Click **Summarize transcript** after transcription, or paste text into the transcript editor. The app uses your existing GROQ_API_KEY with `openai/gpt-oss-20b` on Groq. Long transcripts are processed in sections and the detailed notes are joined in order, preserving examples, formulas, exceptions, and key facts. The summary can be edited and downloaded with a custom filename. Groq free-tier text quotas apply; review the notes against the transcript because completeness cannot be guaranteed.

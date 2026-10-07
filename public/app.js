@@ -1,6 +1,7 @@
 const $ = id => document.getElementById(id);
 let selected = null, audioURL = null, busy = false, configured = false, transcriptName = 'transcript';
 const supported = /\.(mp3|mp4|mpeg|mpga|m4a|wav|webm|ogg|flac)$/i;
+let summaryBusy = false;
 let videoURL = null, videoController = null;
 $('video-cancel').onclick = () => videoController?.abort();
 function downloadName(value, fallback, extension) {
@@ -51,6 +52,7 @@ $('video-form').onsubmit = async event => {
 };
 function status(message, error = false) { $('status').textContent = message; $('status').classList.toggle('error', error); }
 function controls() {
+  updateText();
   $('transcribe').disabled = busy || !selected || !configured;
   ['drop', 'remove', 'language', 'file'].forEach(id => $(id).disabled = busy);
   document.body.classList.toggle('busy', busy);
@@ -83,6 +85,7 @@ function updateText() {
   const words = value ? value.split(/\s+/).length : 0;
   $('wordcount').textContent = `${words} ${words === 1 ? 'word' : 'words'}`;
   $('copy').disabled = $('download').disabled = !value;
+  $('summarize').disabled = summaryBusy || busy || !configured || !value;
 }
 $('text').oninput = updateText;
 $('transcribe').onclick = async () => {
@@ -113,3 +116,22 @@ $('download').onclick = () => {
   const link = document.createElement('a'); link.href = url; link.download = downloadName($('text-name').value, transcriptName, 'txt'); link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 fetch('/api/status').then(response => { if (!response.ok) throw new Error(); return response.json(); }).then(data => { configured = data.configured; $('setup').hidden = configured; controls(); }).catch(() => status('Could not connect to the app server. Refresh to try again.', true));
+
+$('summarize').onclick = async () => {
+  summaryBusy = true; updateText(); $('summarize').textContent = 'Summarizing…';
+  $('summary-status').textContent = 'Creating detailed notes from every section. Long transcripts may take a few minutes.';
+  $('summary-status').classList.remove('error');
+  try {
+    const response = await fetch('/api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: $('text').value }) });
+    const result = await response.json();
+    if (result.summary) { $('summary-text').value = result.summary; $('summary-text').hidden = false; $('summary-download').disabled = false; }
+    if (!response.ok) throw new Error((result.error || 'Summary failed.') + (result.summary ? ' Completed sections are shown below.' : ''));
+    $('summary-status').textContent = 'Your detailed summary is ready to edit and download.';
+  } catch (error) { $('summary-status').textContent = error.message; $('summary-status').classList.add('error'); }
+  finally { summaryBusy = false; updateText(); $('summarize').textContent = 'Summarize transcript ↗'; }
+};
+$('summary-text').oninput = () => $('summary-download').disabled = !$('summary-text').value.trim();
+$('summary-download').onclick = () => {
+  const url = URL.createObjectURL(new Blob([$ ('summary-text').value], { type: 'text/plain;charset=utf-8' }));
+  const link = document.createElement('a'); link.href = url; link.download = downloadName($('summary-name').value, 'summary', 'txt'); link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
