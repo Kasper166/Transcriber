@@ -49,6 +49,15 @@
     <button id="summary-download" class="secondary" disabled>Download Markdown ↓</button>
     <p class="privacy">Free-tier safeguards: summaries are paced at one request per 61 seconds. Audio is capped at 60 minutes/hour and 4 hours/day in this app. Generated with Groq. Review against your transcript; AI summaries can omit or misinterpret details.</p>
   </section>
+  <section class="card summary-card" aria-labelledby="pdf-title">
+    <h2 id="pdf-title">PDF to Markdown</h2>
+    <p class="video-help">Extract selectable text from a PDF into an editable .md file. Runs locally without Groq. Images and complex layouts are not preserved; scanned PDFs need OCR.</p>
+    <form id="pdf-form"><label for="pdf-file">PDF file · up to 25 MB</label><input id="pdf-file" type="file" accept=".pdf,application/pdf" required><button id="pdf-convert" class="primary" type="submit">Convert to Markdown ↗</button></form>
+    <p id="pdf-status" class="status" role="status" aria-live="polite">Choose a PDF to get started.</p>
+    <textarea id="pdf-text" aria-label="Edit PDF Markdown" hidden></textarea>
+    <label for="pdf-name">Markdown filename</label><input id="pdf-name" class="filename-input" value="document" maxlength="120"><span class="muted"> .md</span>
+    <button id="pdf-download" class="secondary" disabled>Download Markdown ↓</button>
+  </section>
   <footer><span>Less time transcribing. More time creating.</span><span>Powered by Groq <span class="green-dot"></span></span></footer>
 </main>
 </body></html>

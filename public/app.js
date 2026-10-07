@@ -135,3 +135,26 @@ $('summary-download').onclick = () => {
   const url = URL.createObjectURL(new Blob([$ ('summary-text').value], { type: 'text/markdown;charset=utf-8' }));
   const link = document.createElement('a'); link.href = url; link.download = downloadName($('summary-name').value, 'summary', 'md'); link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+$('pdf-file').onchange = () => { if ($('pdf-file').files[0]) $('pdf-name').value = $('pdf-file').files[0].name.replace(/\.pdf$/i, ''); };
+$('pdf-form').onsubmit = async event => {
+  event.preventDefault();
+  const file = $('pdf-file').files[0];
+  if (!file) return;
+  if (file.size > 25 * 1024 * 1024) { $('pdf-status').textContent = 'PDF must be 25 MB or smaller.'; return; }
+  $('pdf-convert').disabled = true; $('pdf-status').classList.remove('error'); $('pdf-status').textContent = 'Extracting PDF text…';
+  try {
+    const body = new FormData(); body.set('file', file);
+    const response = await fetch('/api/pdf-markdown', { method: 'POST', body });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'Conversion failed.');
+    $('pdf-text').value = result.markdown; $('pdf-text').hidden = false; $('pdf-download').disabled = false;
+    $('pdf-status').textContent = `Converted ${result.pages} pages. Review and edit the extracted text before saving.`;
+  } catch (error) { $('pdf-status').textContent = error.message; $('pdf-status').classList.add('error'); }
+  finally { $('pdf-convert').disabled = false; }
+};
+$('pdf-text').oninput = () => $('pdf-download').disabled = !$('pdf-text').value.trim();
+$('pdf-download').onclick = () => {
+  const url = URL.createObjectURL(new Blob([$ ('pdf-text').value], { type: 'text/markdown;charset=utf-8' }));
+  const link = document.createElement('a'); link.href = url; link.download = downloadName($('pdf-name').value, 'document', 'md'); link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+};

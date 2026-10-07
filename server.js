@@ -1,3 +1,4 @@
+import { pdfToMarkdown } from './pdf-markdown.js';
 import { summarizeTranscript } from './summarize.js';
 import http from 'node:http';
 import { readFile, mkdtemp, rm, stat } from 'node:fs/promises';
@@ -32,7 +33,7 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
         res.writeHead(200, { 'Content-Type': `${type}; charset=utf-8`, 'X-Content-Type-Options': 'nosniff' });
         return res.end(data);
       }
-      if (req.method !== 'POST' || !['/api/transcribe', '/api/download-video', '/api/summarize'].includes(req.url)) return json(404, { error: 'Not found.' });
+      if (req.method !== 'POST' || !['/api/transcribe', '/api/download-video', '/api/summarize', '/api/pdf-markdown'].includes(req.url)) return json(404, { error: 'Not found.' });
       if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return json(403, { error: 'Invalid request origin.' });
       if (req.url === '/api/download-video') {
         if (!req.headers['content-type']?.startsWith('application/json')) return json(400, { error: 'Send a video link.' });
@@ -66,6 +67,21 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
           if (id) { const timer = setTimeout(() => downloadProgress.delete(id), 60000); timer.unref(); }
         }
         return;
+      }
+      if (req.url === '/api/pdf-markdown') {
+        const limit = 25 * 1024 * 1024;
+        if (!req.headers['content-type']?.startsWith('multipart/form-data;')) return json(400, { error: 'Upload a PDF file.' });
+        let size = 0; const chunks = [];
+        for await (const chunk of req) { size += chunk.length; if (size > limit + 65536) return json(413, { error: 'PDF must be 25 MB or smaller.' }); chunks.push(chunk); }
+        try {
+          const form = await new Request('http://localhost', { method: 'POST', headers: { 'Content-Type': req.headers['content-type'] }, body: Buffer.concat(chunks) }).formData();
+          const file = form.get('file');
+          if (!file || typeof file === 'string' || !file.size || !/\.pdf$/i.test(file.name)) return json(400, { error: 'Choose a PDF file.' });
+          if (file.size > limit) return json(413, { error: 'PDF must be 25 MB or smaller.' });
+          return json(200, await pdfToMarkdown(await file.arrayBuffer(), file.name));
+        } catch (error) {
+          return json(400, { error: /No selectable text|Choose a valid PDF/.test(error.message) ? error.message : 'Could not read this PDF. It may be damaged or password protected.' });
+        }
       }
       if (!apiKey || apiKey === 'your-api-key-here') return json(503, { error: 'Add GROQ_API_KEY to your .env file, then restart the app.' });
       if (req.url === '/api/summarize') {

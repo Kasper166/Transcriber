@@ -1,5 +1,9 @@
 # Speech Notes
 
+## PDF to Markdown
+
+Use **PDF to Markdown** to upload a PDF up to 25 MB, edit its extracted text, and download a `.md` file with a custom filename. Conversion runs on the local server without Groq or API usage. It adds document/page headings and normalizes common bullets. Images, tables, original heading styles, and complex layouts are not reconstructed. Scanned PDFs need OCR and are reported when no selectable text is found.
+
 **[Open Speech Notes](http://localhost:3000)**
 
 Click the link above to open the app on your computer. Start it first with `npm start` and keep that terminal running. GitHub stores the source code; this link opens your local app. Access from other devices requires hosting the Node.js server.
