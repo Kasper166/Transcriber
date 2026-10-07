@@ -119,7 +119,7 @@ fetch('/api/status').then(response => { if (!response.ok) throw new Error(); ret
 
 $('summarize').onclick = async () => {
   summaryBusy = true; updateText(); $('summarize').textContent = 'Summarizing…';
-  $('summary-status').textContent = 'Creating detailed notes from every section. Long transcripts may take a few minutes.';
+  $('summary-status').textContent = 'Creating detailed notes from every section. Free-tier pacing waits 61 seconds between sections; long transcripts can take several minutes.';
   $('summary-status').classList.remove('error');
   try {
     const response = await fetch('/api/summarize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: $('text').value }) });

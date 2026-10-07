@@ -1,19 +1,23 @@
-export async function summarizeTranscript(text, apiKey, fetchAPI = fetch) {
+export async function summarizeTranscript(text, apiKey, fetchAPI = fetch, reserve = async () => {}) {
   // Small sections keep requests manageable on Groq's free tier. Preserve each
   // section's notes instead of compressing them again into a shorter overview.
   const chunks = [];
   let remaining = text.trim();
   while (remaining.length) {
-    let end = Math.min(6000, remaining.length);
+    let end = Math.min(2500, remaining.length);
     if (end < remaining.length) {
       const boundary = remaining.lastIndexOf(' ', end);
-      if (boundary > 3000) end = boundary;
+      if (boundary > 1250) end = boundary;
     }
+    while (Buffer.byteLength(remaining.slice(0, end), 'utf8') > 2400) end--;
+    if (end > 0 && /[\uD800-\uDBFF]/.test(remaining[end - 1])) end--;
     chunks.push(remaining.slice(0, end));
     remaining = remaining.slice(end).trimStart();
   }
   const notes = [];
   for (let i = 0; i < chunks.length; i++) {
+    try { await reserve('text', Buffer.byteLength(chunks[i], 'utf8') + 3600); }
+    catch (error) { error.partial = notes.join('\n\n'); throw error; }
     const response = await fetchAPI('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(120000),

@@ -8,6 +8,20 @@ import { join } from 'node:path';
 const run = promisify(execFile);
 export const API_FILE_LIMIT = 25 * 1024 * 1024;
 
+export async function audioDuration(file) {
+  const directory = await mkdtemp(join(tmpdir(), 'speech-duration-'));
+  try {
+    const input = join(directory, `audio.${file.name.split('.').pop().toLowerCase()}`);
+    await writeFile(input, Buffer.from(await file.arrayBuffer()));
+    let stderr = '';
+    try { await run(ffmpeg, ['-hide_banner', '-nostdin', '-i', input], { timeout: 30000, windowsHide: true }); }
+    catch (error) { stderr = error.stderr || ''; }
+    const match = stderr.match(/Duration:\s*(\d+):(\d+):([\d.]+)/);
+    if (!match) throw new Error('Could not measure audio duration. API upload paused to protect your free-tier budget.');
+    return Math.max(10, Math.ceil(Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3])));
+  } finally { await rm(directory, { recursive: true, force: true }); }
+}
+
 export async function prepareAudio(file) {
   if (file.size <= API_FILE_LIMIT) return { files: [file], cleanup: async () => {} };
   const directory = await mkdtemp(join(tmpdir(), 'speech-notes-'));

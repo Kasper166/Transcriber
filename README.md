@@ -36,3 +36,9 @@ Direct Blackboard MP4 links also work in the website and command-line downloader
 ## Detailed transcript summaries
 
 Click **Summarize transcript** after transcription, or paste text into the transcript editor. The app uses your existing GROQ_API_KEY with `openai/gpt-oss-20b` on Groq. Long transcripts are processed in sections and the detailed notes are joined in order, preserving examples, formulas, exceptions, and key facts. The summary can be edited and downloaded with a custom filename. Groq free-tier text quotas apply; review the notes against the transcript because completeness cannot be guaranteed.
+
+## Free-tier safeguards
+
+The local server reserves usage before API requests and persists it in ignored `.groq-usage.json`, so restarting does not reset limits. Summaries use small UTF-8 sections, at most 3,000 output tokens, one request per 61 seconds, and a conservative 100,000-token reservation budget per rolling 24 hours. Audio is limited to 60 minutes per rolling hour and 4 hours per rolling 24 hours. Failed calls also retain their reservations. These caps leave headroom beneath Groq’s published default free quotas. Requests stop on errors instead of retrying automatically. Downloading videos does not use Groq.
+
+Keep the Groq account on the Free plan. These safeguards only count this app; usage from other apps, account-specific lower limits, and deleting the usage file can affect the remaining quota. They cannot enforce account billing settings.

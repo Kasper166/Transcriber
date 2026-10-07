@@ -7,13 +7,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { downloadVideo, playlistURL } from './download-video.js';
 import { fileURLToPath } from 'node:url';
-import { prepareAudio } from './audio.js';
+import { createUsageGuard } from './usage.js';
+import { prepareAudio, audioDuration } from './audio.js';
 
 const MAX_FILE = 500 * 1024 * 1024;
 const extensions = new Set(['mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'wav', 'webm', 'ogg', 'flac']);
 const assets = { '/': ['index.html', 'text/html'], '/style.css': ['style.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'] };
 
-export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fetch, prepare = prepareAudio, download = downloadVideo } = {}) {
+export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fetch, prepare = prepareAudio, download = downloadVideo, reserve = async () => {} } = {}) {
   const downloadProgress = new Map();
   return http.createServer(async (req, res) => {
     const json = (status, value) => { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(value)); };
@@ -74,7 +75,7 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
         let text;
         try { text = JSON.parse(Buffer.concat(chunks).toString()).text; } catch { return json(400, { error: 'Invalid transcript.' }); }
         if (typeof text !== 'string' || !text.trim()) return json(400, { error: 'Add a transcript first.' });
-        try { return json(200, { summary: await summarizeTranscript(text, apiKey, fetchAPI) }); }
+        try { return json(200, { summary: await summarizeTranscript(text, apiKey, fetchAPI, reserve) }); }
         catch (error) { return json(502, { error: error.message, summary: error.partial || '' }); }
       }
       if (!req.headers['content-type']?.startsWith('multipart/form-data;')) return json(400, { error: 'Please upload an audio file.' });
@@ -101,6 +102,10 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
       try {
       const texts = [];
       for (const audio of prepared.files) {
+      if (reserve.enforceAudio) {
+        try { await reserve('audio', await audioDuration(audio)); }
+        catch (error) { return json(429, { error: error.message, text: texts.join('\n\n') }); }
+      }
       const upload = new FormData();
       upload.set('file', audio, audio.name);
       upload.set('model', 'whisper-large-v3');
@@ -127,5 +132,6 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY, fetchAPI = fet
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 3000);
-  createServer().listen(port, '127.0.0.1', () => console.log(`Speech Notes is ready at http://localhost:${port}`));
+  const reserve = createUsageGuard(); reserve.enforceAudio = true;
+  createServer({ reserve }).listen(port, '127.0.0.1', () => console.log(`Speech Notes is ready at http://localhost:${port}`));
 }
