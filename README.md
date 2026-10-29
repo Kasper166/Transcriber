@@ -52,3 +52,22 @@ You can also paste text into **Text to summarize** in the summary section and cl
 ## Two Groq API keys
 
 Set `GROQ_API_KEY1` and `GROQ_API_KEY2` in `.env`. The original `GROQ_API_KEY` is still supported. When Groq returns HTTP 429, the app tries the other key once and prefers the working key for later requests. If both keys are limited, it reports the error. Keys in the same organization share Groq limits. Local usage budgets remain shared across keys and are never bypassed by fallback.
+
+## Transcribe a file that is already on this computer
+
+`POST /api/transcribe-path` transcribes a recording straight from disk, without the browser upload and without the 500 MB cap. It is meant for scripts and for Claude (which calls it from the browser on `localhost`).
+
+```js
+await fetch('/api/transcribe-path', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ path: 'C:\\Users\\me\\2de_jaar\\AI\\Lectures\\AI_Lecture_04.mp4', language: 'nl' }) }).then(r => r.json());
+// → 202 { id, status: 'running', path, transcriptPath }
+await fetch(`/api/jobs/${id}`).then(r => r.json());
+// → { status: 'running' | 'done' | 'error', percent, stage, transcriptPath, words?, error? }
+```
+
+- The audio is extracted with FFmpeg into 10-minute MP3 chunks, sent to Groq in order, and saved as `<name>_transcript.txt` next to the recording.
+- `timestamps` (default `true`) writes one `[hh:mm:ss] text` line per Whisper segment, so notes can point back to the moment in the lecture.
+- `save: false` keeps the transcript in the job (`text`) instead of writing a file. An existing transcript is never replaced unless you send `overwrite: true`.
+- If a later chunk fails (for example the hourly budget), the finished parts are kept in `<name>_transcript.txt.partial` and the job reports the error.
+- One path job runs at a time. The same free-tier safeguards apply (60 audio minutes per rolling hour, 4 hours per day), but a path job that hits the hourly budget waits and resumes by itself, so a 2-hour lecture finishes in about an hour and a half. The daily budget still stops the job.
+- Only files inside `TRANSCRIBE_ROOTS` (default: your home folder) can be read, and only audio/video extensions are accepted.
