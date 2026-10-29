@@ -69,5 +69,5 @@ await fetch(`/api/jobs/${id}`).then(r => r.json());
 - `timestamps` (default `true`) writes one `[hh:mm:ss] text` line per Whisper segment, so notes can point back to the moment in the lecture.
 - `save: false` keeps the transcript in the job (`text`) instead of writing a file. An existing transcript is never replaced unless you send `overwrite: true`.
 - If a later chunk fails (for example the hourly budget), the finished parts are kept in `<name>_transcript.txt.partial` and the job reports the error.
-- One path job runs at a time. The same free-tier safeguards apply: 60 audio minutes per rolling hour and 4 hours per day.
+- One path job runs at a time. The same free-tier safeguards apply (60 audio minutes per rolling hour, 4 hours per day), but a path job that hits the hourly budget waits and resumes by itself, so a 2-hour lecture finishes in about an hour and a half. The daily budget still stops the job.
 - Only files inside `TRANSCRIBE_ROOTS` (default: your home folder) can be read, and only audio/video extensions are accepted.

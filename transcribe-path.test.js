@@ -88,3 +88,23 @@ test('keeps completed parts in a .partial file and reports the error when a late
     });
   } finally { await rm(root, { recursive: true, force: true }); }
 });
+
+test('waits for the hourly audio budget instead of failing, but stops on the daily budget', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'path-test-'));
+  try {
+    const lecture = join(root, 'Lec.mp4'); await writeFile(lecture, 'video');
+    for (const daily of [false, true]) {
+      let reservations = 0, waits = 0;
+      const reserve = async () => { if (++reservations === 2) throw new Error(daily ? 'Local free-tier safety budget reached for audio.' : 'Local audio safety limit reached: 60 minutes per rolling hour.'); };
+      reserve.enforceAudio = true;
+      await withServer({ apiKey: 'test', roots: [root], reserve, sleep: async () => { waits++; }, budgetRetryMs: 0, measure: async () => 600,
+        preparePath: async () => ({ files: [new File(['RIFF'], 'a.wav'), new File(['RIFF'], 'b.wav')], cleanup: async () => {} }),
+        fetchAPI: async () => Response.json({ text: 'x', segments: [{ start: 0, text: 'x' }] }) }, async url => {
+        const { id } = await (await post(url, { path: lecture, overwrite: true })).json();
+        const job = await waitForJob(url, id);
+        assert.equal(job.status, daily ? 'error' : 'done');
+        assert.equal(waits, daily ? 0 : 1);
+      });
+    }
+  } finally { await rm(root, { recursive: true, force: true }); }
+});

@@ -26,7 +26,7 @@ export const transcriptPathFor = path => join(dirname(path), `${basename(path, e
 
 const assets = { '/': ['index.html', 'text/html'], '/style.css': ['style.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'] };
 
-export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env.GROQ_API_KEY, apiKey2 = process.env.GROQ_API_KEY2, fetchAPI = fetch, prepare = prepareAudio, preparePath = prepareAudioFromPath, download = downloadVideo, reserve = async () => {}, roots = allowedRoots() } = {}) {
+export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env.GROQ_API_KEY, apiKey2 = process.env.GROQ_API_KEY2, fetchAPI = fetch, prepare = prepareAudio, preparePath = prepareAudioFromPath, download = downloadVideo, reserve = async () => {}, roots = allowedRoots(), sleep = ms => new Promise(r => setTimeout(r, ms)), budgetRetryMs = 60000, measure = audioDuration } = {}) {
   fetchAPI = withGroqFallback(fetchAPI, [apiKey, apiKey2]);
   if (!apiKey || apiKey === 'your-api-key-here') apiKey = apiKey2;
   const downloadProgress = new Map();
@@ -36,13 +36,21 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env
 
   // Sends prepared chunks to Groq in order. With timestamps, each Whisper segment becomes a "[hh:mm:ss] text" line,
   // offset by CHUNK_SECONDS per chunk (path jobs always split into fixed-length chunks).
-  async function transcribeChunks(prepared, language, progress, timestamps = false) {
+  // With waitForBudget, a full hourly audio budget pauses the job (checking every minute) instead of failing it.
+  async function transcribeChunks(prepared, language, progress, timestamps = false, waitForBudget = false) {
     const texts = [];
     for (const audio of prepared.files) {
       progress({ percent: Math.floor(texts.length / prepared.files.length * 100), stage: `Transcribing part ${texts.length + 1} of ${prepared.files.length}` });
       if (reserve.enforceAudio) {
-        try { await reserve('audio', await audioDuration(audio)); }
-        catch (error) { return { status: 429, error: error.message, text: texts.join('\n\n') }; }
+        const seconds = await measure(audio);
+        for (;;) {
+          try { await reserve('audio', seconds); break; }
+          catch (error) {
+            if (!waitForBudget || !/per rolling hour/.test(error.message)) return { status: 429, error: error.message, text: texts.join(timestamps ? '\n' : '\n\n') };
+            progress({ stage: `Hourly audio budget used; waiting to transcribe part ${texts.length + 1} of ${prepared.files.length}` });
+            await sleep(budgetRetryMs);
+          }
+        }
       }
       const upload = new FormData();
       upload.set('file', audio, audio.name);
@@ -169,7 +177,7 @@ export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env
           try {
             try { prepared = await preparePath(path); }
             catch { throw new Error('Could not read the audio in this recording.'); }
-            const result = await transcribeChunks(prepared, language, progress, Boolean(timestamps));
+            const result = await transcribeChunks(prepared, language, progress, Boolean(timestamps), true);
             if (result.status !== 200) {
               job.text = result.text;
               if (transcriptPath && result.text) await writeFile(`${transcriptPath}.partial`, result.text, 'utf8');
