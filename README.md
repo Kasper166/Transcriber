@@ -51,7 +51,7 @@ You can also paste text into **Text to summarize** in the summary section and cl
 
 ## Two Groq API keys
 
-Set `GROQ_API_KEY1` and `GROQ_API_KEY2` in `.env`. The original `GROQ_API_KEY` is still supported. When Groq returns HTTP 429, the app tries the other key once and prefers the working key for later requests. If both keys are limited, it reports the error. Keys in the same organization share Groq limits. Local usage budgets remain shared across keys and are never bypassed by fallback.
+Set `GROQ_API_KEY1`, `GROQ_API_KEY2` and optionally `GROQ_API_KEY3` in `.env`. The original `GROQ_API_KEY` is still supported. When Groq returns HTTP 429, the app tries each other key once and prefers the working key for later requests. If all keys are limited, it reports the error. Keys in the same organization share Groq limits. Local usage budgets remain shared across keys and are never bypassed by fallback.
 
 ## Transcribe a file that is already on this computer
 

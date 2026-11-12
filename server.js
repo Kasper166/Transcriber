@@ -26,9 +26,9 @@ export const transcriptPathFor = path => join(dirname(path), `${basename(path, e
 
 const assets = { '/': ['index.html', 'text/html'], '/style.css': ['style.css', 'text/css'], '/app.js': ['app.js', 'text/javascript'] };
 
-export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env.GROQ_API_KEY, apiKey2 = process.env.GROQ_API_KEY2, fetchAPI = fetch, prepare = prepareAudio, preparePath = prepareAudioFromPath, download = downloadVideo, reserve = async () => {}, roots = allowedRoots(), sleep = ms => new Promise(r => setTimeout(r, ms)), budgetRetryMs = 60000, measure = audioDuration } = {}) {
-  fetchAPI = withGroqFallback(fetchAPI, [apiKey, apiKey2]);
-  if (!apiKey || apiKey === 'your-api-key-here') apiKey = apiKey2;
+export function createServer({ apiKey = process.env.GROQ_API_KEY1 || process.env.GROQ_API_KEY, apiKey2 = process.env.GROQ_API_KEY2, apiKey3 = process.env.GROQ_API_KEY3, fetchAPI = fetch, prepare = prepareAudio, preparePath = prepareAudioFromPath, download = downloadVideo, reserve = async () => {}, roots = allowedRoots(), sleep = ms => new Promise(r => setTimeout(r, ms)), budgetRetryMs = 60000, measure = audioDuration } = {}) {
+  fetchAPI = withGroqFallback(fetchAPI, [apiKey, apiKey2, apiKey3]);
+  if (!apiKey || apiKey === 'your-api-key-here') apiKey = apiKey2 || apiKey3;
   const downloadProgress = new Map();
   const apiProgress = new Map();
   const report = id => progress => { if (/^[a-zA-Z0-9-]{1,64}$/.test(id || '')) apiProgress.set(id, { ...(apiProgress.get(id) || {}), ...progress, updated: Date.now() }); };
